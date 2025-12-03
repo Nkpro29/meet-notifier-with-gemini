@@ -10,15 +10,7 @@ import { Bell, Loader2, AlertCircle, CheckCircle, Video } from "lucide-react";
 import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-interface ConferenceRecord {
-  name: string;
-  startTime: string;
-  endTime?: string;
-  space?: {
-    meetingCode?: string;
-    name?: string;
-  };
-}
+
 
 interface Mention {
   text: string;
@@ -31,7 +23,6 @@ interface Mention {
 export default function MonitorPage() {
   const [authenticated, setAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [conferences, setConferences] = useState<ConferenceRecord[]>([]);
   const [selectedConference, setSelectedConference] = useState("");
   const [nameToMonitor, setNameToMonitor] = useState("");
   const [monitoring, setMonitoring] = useState(false);
@@ -50,7 +41,7 @@ export default function MonitorPage() {
       setAuthenticated(data.authenticated);
       
       if (data.authenticated) {
-        loadConferences();
+        // Authenticated
       }
     } catch (error) {
       console.error("Auth check failed:", error);
@@ -59,17 +50,7 @@ export default function MonitorPage() {
     }
   };
 
-  const loadConferences = async () => {
-    try {
-      const response = await fetch("/api/meet/conferences");
-      if (response.ok) {
-        const data = await response.json();
-        setConferences(data.conferences || []);
-      }
-    } catch (error) {
-      console.error("Failed to load conferences:", error);
-    }
-  };
+
 
   const startMonitoring = async () => {
     if (!selectedConference || !nameToMonitor) {
@@ -199,26 +180,19 @@ export default function MonitorPage() {
 
             <div className="space-y-4">
               <div>
-                <Label htmlFor="conference">Select Meeting</Label>
-                <select
+                <Label htmlFor="conference">Meeting ID</Label>
+                <Input
                   id="conference"
-                  className="w-full mt-2 p-2 border rounded-md bg-white dark:bg-gray-800"
+                  type="text"
+                  placeholder="e.g., abc-defg-hij"
                   value={selectedConference}
                   onChange={(e) => setSelectedConference(e.target.value)}
                   disabled={monitoring}
-                >
-                  <option value="">-- Select a meeting --</option>
-                  {conferences.map((conf) => (
-                    <option key={conf.name} value={conf.name.split("/").pop()}>
-                      {conf.space?.meetingCode || "Meeting"} - {new Date(conf.startTime).toLocaleString()}
-                    </option>
-                  ))}
-                </select>
-                {conferences.length === 0 && (
-                  <p className="text-sm text-gray-500 mt-2">
-                    No recent meetings found. Meetings must have ended for transcripts to be available.
-                  </p>
-                )}
+                  className="mt-2"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Enter the Google Meet conference ID (from the URL)
+                </p>
               </div>
 
               <div>

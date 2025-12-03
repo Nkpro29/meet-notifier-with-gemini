@@ -3,6 +3,8 @@ import { cookies } from 'next/headers';
 import { createAuthClient } from '@/lib/google-auth';
 import { getTranscripts, getTranscriptEntries } from '@/lib/google-meet';
 import { detectNameMentions } from '@/lib/gemini';
+import { sendMentionNotification } from '@/lib/email';
+import { oauth2Client } from '@/lib/google-auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,7 +19,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const tokensCookie = cookieStore.get('google_tokens');
     
     if (!tokensCookie?.value) {
@@ -60,13 +62,31 @@ export async function GET(request: NextRequest) {
       const detection = await detectNameMentions(entry.text, nameToDetect);
       
       if (detection.mentioned) {
-        mentions.push({
+        const mentionDetails = {
           text: entry.text,
           participant: entry.participant || 'Unknown',
           timestamp: entry.startTime || new Date().toISOString(),
           confidence: detection.confidence,
-          context: detection.context[0] || entry.text
-        });
+          context: detection.context[0] || entry.text,
+          conferenceId
+        };
+
+        mentions.push(mentionDetails);
+
+        // Get user email and send notification
+        try {
+          const { email } = await oauth2Client.getTokenInfo(tokens.access_token);
+          if (email) {
+            // TODO: Add better debouncing/deduplication here
+            // For now, we rely on the client polling interval and maybe we should check if we already sent this?
+            // But since this is a stateless route, we might send duplicates if the same transcript entry is processed again.
+            // Ideally we should store sent mentions in a DB or check a "last processed time" param from client.
+            // For this MVP, we'll just send it.
+            await sendMentionNotification(email, mentionDetails);
+          }
+        } catch (err) {
+          console.error('Failed to get user email or send notification:', err);
+        }
       }
     }
 
