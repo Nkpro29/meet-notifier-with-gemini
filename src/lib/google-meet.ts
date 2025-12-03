@@ -26,6 +26,38 @@ export async function getConferenceRecords(
   }
 }
 
+export async function getLatestConferenceByCode(
+  auth: OAuth2Client,
+  meetingCode: string
+) {
+  try {
+    // The filter format for meeting code is "space.meetingCode = 'abc-defg-hij'"
+    // Note: The API might require exact match or specific filter syntax.
+    // Based on docs, it's usually `space.meetingCode="code"`
+    const response = await meet.conferenceRecords.list({
+      auth,
+      filter: `space.meetingCode="${meetingCode}"`
+    });
+    
+    const records = response.data.conferenceRecords || [];
+    
+    if (records.length === 0) {
+      return null;
+    }
+
+    // Sort by start time descending to get the latest one
+    // The API might not guarantee order, so we sort manually
+    return records.sort((a, b) => {
+      const timeA = new Date(a.startTime || 0).getTime();
+      const timeB = new Date(b.startTime || 0).getTime();
+      return timeB - timeA;
+    })[0];
+  } catch (error) {
+    console.error('Failed to get conference by code:', error);
+    throw error;
+  }
+}
+
 export async function getConferenceDetails(
   auth: OAuth2Client,
   conferenceId: string

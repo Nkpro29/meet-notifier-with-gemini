@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createAuthClient } from '@/lib/google-auth';
-import { getTranscripts, getTranscriptEntries } from '@/lib/google-meet';
+import { getTranscripts, getTranscriptEntries, getLatestConferenceByCode } from '@/lib/google-meet';
 import { detectNameMentions } from '@/lib/gemini';
 import { sendMentionNotification } from '@/lib/email';
 import { oauth2Client } from '@/lib/google-auth';
@@ -9,7 +9,7 @@ import { oauth2Client } from '@/lib/google-auth';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const conferenceId = searchParams.get('conferenceId');
+    let conferenceId = searchParams.get('conferenceId');
     const nameToDetect = searchParams.get('name');
 
     if (!conferenceId || !nameToDetect) {
@@ -28,6 +28,20 @@ export async function GET(request: NextRequest) {
 
     const tokens = JSON.parse(tokensCookie.value);
     const auth = createAuthClient(tokens);
+
+    // Check if conferenceId is a meeting code (xxx-yyyy-zzz)
+    const meetingCodeRegex = /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/;
+    if (meetingCodeRegex.test(conferenceId)) {
+      const conference = await getLatestConferenceByCode(auth, conferenceId);
+      if (!conference || !conference.name) {
+        return NextResponse.json(
+          { error: 'No conference record found for this meeting code' },
+          { status: 404 }
+        );
+      }
+      // conference.name is like "conferenceRecords/ID"
+      conferenceId = conference.name.split('/').pop()!;
+    }
 
     // Get transcripts for the conference
     const transcripts = await getTranscripts(auth, conferenceId);
